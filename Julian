@@ -1,0 +1,147 @@
+#!/usr/bin/python
+#+
+# Conversion between Gregorian dates and Julian days/times. This
+# script can be invoked in various ways (all dates/times in UTC):
+#
+#    Julian -d|--days
+#         outputs the current Julian day number.
+#    Julian -s|--seconds
+#         outputs the current Julian seconds
+#         (Julian day number * 84600 plus seconds since midnight)
+#    Julian -d|--days n
+#         outputs the Gregorian year, month and day corresponding
+#         to Julian day n.
+#    Julian -s|--seconds n
+#         outputs the Gregorian year, month and day and hours, minutes
+#         and seconds since midnight corresponding to Julian seconds n.
+#    Julian -d|--days y m d
+#         outputs the Julian day corresponding to the specified
+#         Gregorian year, month and day.
+#    Julian -s|--seconds y m d h m s
+#         outputs the Julian seconds corresponding to the specified
+#         Gregorian year, month and day and hours, minutes and seconds
+#         since midnight.
+#
+# Created 2007 January 11 by Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
+#-
+
+import sys
+import time
+import getopt
+
+#+
+# Useful stuff
+#-
+
+SecondsPerDay = 86400
+UNIXBaseJulianDay = 2440588 # = GregorianToJulianDay(1970, 1, 1)
+UNIXBaseJulianSeconds = UNIXBaseJulianDay * SecondsPerDay
+
+def GregorianToJulianDay(Year, Month, Day) :
+	"""returns the Julian day number corresponding to the specified
+	Gregorian calendar date."""
+	return \
+			1461 * (Year + 4800 + (Month - 14) / 12) / 4 \
+		+ \
+			367 * (Month - 2 - 12 * ((Month - 14) / 12)) / 12 \
+		- \
+			3 * ((Year + 4900 + (Month - 14) / 12) / 100) / 4 \
+		+ \
+			Day \
+		- \
+			32075
+#end GregorianToJulianDay
+
+def JulianDayToGregorian(JulianDay) :
+	"""returns the Gregorian calendar date (Year, Month, Day) corresponding
+	to the specified Julian day number."""
+	l = JulianDay + 68569
+	n = 4 * l / 146097
+	l = l - (146097 * n + 3) / 4
+	i = (4000 * (l + 1)) / 1461001
+	l = l - 1461 * i / 4 + 31
+	j = 80 * l / 2447
+	Day = l - 2447 * j / 80
+	l = j / 11
+	Month = j + 2 - 12 * l
+	Year = 100 * (n - 49) + i + l
+	return (Year, Month, Day)
+#end JulianDayToGregorian
+
+def NowJulian() :
+	"""returns the number of Julian-day seconds for the
+	present moment (UTC)."""
+	return \
+			UNIXBaseJulianSeconds \
+		+ \
+			int(time.time())
+#end NowJulian
+
+#+
+# Mainline
+#-
+
+(Opts, Args) = getopt.getopt \
+  (
+	sys.argv[1:],
+	"ds",
+	["days", "seconds",]
+  )
+DoSeconds = None
+for Keyword, Value in Opts :
+	if Keyword == "-d" or Keyword == "--days" :
+		DoSeconds = False
+	elif Keyword == "-s" or Keyword == "--seconds" :
+		DoSeconds = True
+	#end if
+#end for
+if DoSeconds == None :
+	raise getopt.GetoptError("must specify either --days or --seconds")
+#end if
+if DoSeconds : # conversions in seconds
+	if len(Args) == 1 :
+		Time = int(Args[0])
+		Date = JulianDayToGregorian(int(Time / SecondsPerDay))
+		Time %= SecondsPerDay
+		Hours = int(Time / 3600)
+		Minutes = int(Time / 60) % 60
+		Seconds = Time % 60
+		Result = Date + (Hours, Minutes, Seconds)
+	elif len(Args) == 6 :
+		Result = \
+		  (
+					GregorianToJulianDay
+					  (
+						int(Args[0]),
+						int(Args[1]),
+						int(Args[2])
+					  )
+				*
+					SecondsPerDay
+			+
+				int(Args[3]) * 3600
+			+
+				int(Args[4]) * 60
+			+
+				int(Args[5]),
+		  )
+	elif len(Args) == 0 :
+		Result = (NowJulian(),)
+	else :
+		raise getopt.GetoptError("must specify 0, 1 or 6 args for --seconds")
+	#end if
+else : # conversions in days
+	if len(Args) == 1 :
+		Result = JulianDayToGregorian(int(Args[0]))
+	elif len(Args) == 3 :
+		Result = \
+			(
+				GregorianToJulianDay(int(Args[0]), int(Args[1]), int(Args[2])),
+			)
+	elif len(Args) == 0 :
+		Result = (int(NowJulian() / SecondsPerDay),)
+	else :
+		raise getopt.GetoptError("must specify 0, 1 or 3 args for --days")
+	#end if
+#end if
+sys.stdout.write(" ".join([str(i) for i in Result]) + "\n")
