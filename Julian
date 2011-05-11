@@ -52,14 +52,14 @@ UNIXBaseJulianSeconds = UNIXBaseJulianDay * SecondsPerDay
 def GregorianToJulianDay(Year, Month, Day) :
     """returns the Julian day number corresponding to the specified
     Gregorian calendar date."""
-    M = int(Month - 14.0) // 12
+    M = int((Month - 14) / 12)
     return \
         (
-            1461 * (Year + 4800 + M) // 4
+            int(1461 * (Year + 4800 + M) / 4)
         +
-            367 * (Month - 2 - 12 * M) // 12
+            int(367 * (Month - 2 - 12 * M) / 12)
         -
-            3 * ((Year + 4900 + M) // 100) // 4
+            int(3 * ((Year + 4900 + M) // 100) / 4)
         +
             Day
         -
@@ -71,13 +71,13 @@ def JulianDayToGregorian(JulianDay) :
     """returns the Gregorian calendar date (Year, Month, Day) corresponding
     to the specified Julian day number."""
     l = JulianDay + 68569
-    n = 4 * l // 146097
-    l = l - (146097 * n + 3) // 4
-    i = (4000 * (l + 1)) // 1461001
-    l = l - 1461 * i // 4 + 31
-    j = 80 * l // 2447
-    Day = l - 2447 * j // 80
-    l = j // 11
+    n = int(4 * l / 146097)
+    l = l - int((146097 * n + 3) / 4)
+    i = int((4000 * (l + 1)) / 1461001)
+    l = l - int(1461 * i / 4) + 31
+    j = int(80 * l / 2447)
+    Day = l - int(2447 * j / 80)
+    l = int(j / 11)
     Month = j + 2 - 12 * l
     Year = 100 * (n - 49) + i + l
     return (Year, Month, Day)
