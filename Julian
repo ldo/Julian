@@ -22,8 +22,7 @@
 #         Gregorian year, month and day and hours, minutes and seconds
 #         since midnight.
 #
-# Created 2007 January 11 by Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
-# Fix GregorianToJulianDay for floor division 2007 February 28.
+# Written by Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
 #-
 
 import sys
@@ -43,15 +42,17 @@ def GregorianToJulianDay(Year, Month, Day) :
 	Gregorian calendar date."""
 	M = int((Month - 14.0) / 12)
 	return \
-			1461 * (Year + 4800 + M) / 4 \
-		+ \
-			367 * (Month - 2 - 12 * M) / 12 \
-		- \
-			3 * ((Year + 4900 + M) / 100) / 4 \
-		+ \
-			Day \
-		- \
+		(
+			1461 * (Year + 4800 + M) / 4
+		+
+			367 * (Month - 2 - 12 * M) / 12
+		-
+			3 * ((Year + 4900 + M) / 100) / 4
+		+
+			Day
+		-
 			32075
+		)
 #end GregorianToJulianDay
 
 def JulianDayToGregorian(JulianDay) :
@@ -74,9 +75,11 @@ def NowJulian() :
 	"""returns the number of Julian-day seconds for the
 	present moment (UTC)."""
 	return \
-			UNIXBaseJulianSeconds \
-		+ \
+		(
+			UNIXBaseJulianSeconds
+		+
 			int(time.time())
+		)
 #end NowJulian
 
 #+
