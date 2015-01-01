@@ -44,158 +44,158 @@ import getopt
 # Useful stuff
 #-
 
-SecondsPerDay = 86400
-UNIXBaseJulianDay = 2440588 # = GregorianToJulianDay(1970, 1, 1)
-UNIXBaseJulianSeconds = UNIXBaseJulianDay * SecondsPerDay
+seconds_per_day = 86400
+unix_base_julian_day = 2440588 # = gregorian_to_julian_day(1970, 1, 1)
+unix_base_julian_seconds = unix_base_julian_day * seconds_per_day
 
-def GregorianToJulianDay(Year, Month, Day) :
+def gregorian_to_julian_day(year, month, day) :
     """returns the Julian day number corresponding to the specified
     Gregorian calendar date."""
-    M = int((Month - 14) / 12)
+    m = int((month - 14) / 12)
     return \
         (
-            int(1461 * (Year + 4800 + M) / 4)
+            int(1461 * (year + 4800 + m) / 4)
         +
-            int(367 * (Month - 2 - 12 * M) / 12)
+            int(367 * (month - 2 - 12 * m) / 12)
         -
-            int(3 * ((Year + 4900 + M) // 100) / 4)
+            int(3 * ((year + 4900 + m) // 100) / 4)
         +
-            Day
+            day
         -
             32075
         )
-#end GregorianToJulianDay
+#end gregorian_to_julian_day
 
-def JulianDayToGregorian(JulianDay) :
-    """returns the Gregorian calendar date (Year, Month, Day) corresponding
+def julian_day_to_gregorian(julian_day) :
+    """returns the Gregorian calendar date (year, month, day) corresponding
     to the specified Julian day number."""
-    l = JulianDay + 68569
+    l = julian_day + 68569
     n = int(4 * l / 146097)
     l = l - int((146097 * n + 3) / 4)
     i = int((4000 * (l + 1)) / 1461001)
     l = l - int(1461 * i / 4) + 31
     j = int(80 * l / 2447)
-    Day = l - int(2447 * j / 80)
+    day = l - int(2447 * j / 80)
     l = int(j / 11)
-    Month = j + 2 - 12 * l
-    Year = 100 * (n - 49) + i + l
-    return (Year, Month, Day)
-#end JulianDayToGregorian
+    month = j + 2 - 12 * l
+    year = 100 * (n - 49) + i + l
+    return (year, month, day)
+#end julian_day_to_gregorian
 
-def NowJulian() :
+def now_julian() :
     """returns the number of Julian-day seconds for the
     present moment (UTC)."""
     return \
         (
-            UNIXBaseJulianSeconds
+            unix_base_julian_seconds
         +
             int(time.time())
         )
-#end NowJulian
+#end now_julian
 
 #+
 # Mainline
 #-
 
-(Opts, Args) = getopt.getopt \
+(opts, args) = getopt.getopt \
   (
     sys.argv[1:],
     "dfs",
     ["days", "fracdays", "seconds",]
   )
-DoWhat = None
-for Keyword, Value in Opts :
-    if Keyword == "-d" or Keyword == "--days" :
-        DoWhat = "days"
-    elif Keyword == "-f" or Keyword == "--fracdays" :
-        DoWhat = "fracdays"
-    elif Keyword == "-s" or Keyword == "--seconds" :
-        DoWhat = "seconds"
+do_what = None
+for keyword, value in opts :
+    if keyword == "-d" or keyword == "--days" :
+        do_what = "days"
+    elif keyword == "-f" or keyword == "--fracdays" :
+        do_what = "fracdays"
+    elif keyword == "-s" or keyword == "--seconds" :
+        do_what = "seconds"
     #end if
 #end for
-if DoWhat == None :
+if do_what == None :
     raise getopt.GetoptError("must specify either --days or --seconds")
 #end if
-if DoWhat == "seconds" : # conversions in seconds
-    if len(Args) == 1 :
-        Time = int(Args[0])
-        Date = JulianDayToGregorian(Time // SecondsPerDay)
-        Time %= SecondsPerDay
-        Hours = Time // 3600
-        Minutes = Time // 60 % 60
-        Seconds = Time % 60
-        Result = Date + (Hours, Minutes, Seconds)
-    elif len(Args) == 6 :
-        Result = \
+if do_what == "seconds" : # conversions in seconds
+    if len(args) == 1 :
+        timeval = int(args[0])
+        dateval = julian_day_to_gregorian(timeval // seconds_per_day)
+        timeval %= seconds_per_day
+        hours = timeval // 3600
+        minutes = timeval // 60 % 60
+        seconds = timeval % 60
+        result = dateval + (hours, minutes, seconds)
+    elif len(args) == 6 :
+        result = \
           (
-                    GregorianToJulianDay
+                    gregorian_to_julian_day
                       (
-                        int(Args[0]),
-                        int(Args[1]),
-                        int(Args[2])
+                        int(args[0]),
+                        int(args[1]),
+                        int(args[2])
                       )
                 *
-                    SecondsPerDay
+                    seconds_per_day
             +
-                int(Args[3]) * 3600
+                int(args[3]) * 3600
             +
-                int(Args[4]) * 60
+                int(args[4]) * 60
             +
-                int(Args[5]),
+                int(args[5]),
           )
-    elif len(Args) == 0 :
-        Result = (NowJulian(),)
+    elif len(args) == 0 :
+        result = (now_julian(),)
     else :
         raise getopt.GetoptError("must specify 0, 1 or 6 args for --seconds")
     #end if
-elif DoWhat == "fracdays" :
-    if len(Args) == 1 :
-        Time = float(Args[0])
-        Date = JulianDayToGregorian(int(Time))
-        TimeOfDay = int((Time - int(Time)) * SecondsPerDay)
-        Hours = int(TimeOfDay) // 3600
-        Minutes = int(TimeOfDay) // 60 % 60
-        Seconds = TimeOfDay % 60
-        Result = Date + (Hours, Minutes, Seconds)
-    elif len(Args) == 6 :
-        Result = \
+elif do_what == "fracdays" :
+    if len(args) == 1 :
+        timeval = float(args[0])
+        dateval = julian_day_to_gregorian(int(timeval))
+        time_of_day = int((timeval - int(timeval)) * seconds_per_day)
+        hours = int(time_of_day) // 3600
+        minutes = int(time_of_day) // 60 % 60
+        seconds = time_of_day % 60
+        result = dateval + (hours, minutes, seconds)
+    elif len(args) == 6 :
+        result = \
           (
                 (
-                        GregorianToJulianDay
+                        gregorian_to_julian_day
                           (
-                            int(Args[0]),
-                            int(Args[1]),
-                            int(Args[2])
+                            int(args[0]),
+                            int(args[1]),
+                            int(args[2])
                           )
                     *
-                        SecondsPerDay
+                        seconds_per_day
                 +
-                    int(Args[3]) * 3600
+                    int(args[3]) * 3600
                 +
-                    int(Args[4]) * 60
+                    int(args[4]) * 60
                 +
-                    int(Args[5])
+                    int(args[5])
                 )
             /
-                SecondsPerDay,
+                seconds_per_day,
           )
-    elif len(Args) == 0 :
-        Result = (NowJulian() / SecondsPerDay,)
+    elif len(args) == 0 :
+        result = (now_julian() / seconds_per_day,)
     else :
         raise getopt.GetoptError("must specify 0, 1 or 6 args for --fracdays")
     #end if
 else : # conversions in whole days
-    if len(Args) == 1 :
-        Result = JulianDayToGregorian(int(Args[0]))
-    elif len(Args) == 3 :
-        Result = \
+    if len(args) == 1 :
+        result = julian_day_to_gregorian(int(args[0]))
+    elif len(args) == 3 :
+        result = \
             (
-                GregorianToJulianDay(int(Args[0]), int(Args[1]), int(Args[2])),
+                gregorian_to_julian_day(int(args[0]), int(args[1]), int(args[2])),
             )
-    elif len(Args) == 0 :
-        Result = (NowJulian() // SecondsPerDay,)
+    elif len(args) == 0 :
+        result = (now_julian() // seconds_per_day,)
     else :
         raise getopt.GetoptError("must specify 0, 1 or 3 args for --days")
     #end if
 #end if
-sys.stdout.write(" ".join([str(i) for i in Result]) + "\n")
+sys.stdout.write(" ".join([str(i) for i in result]) + "\n")
