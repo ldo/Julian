@@ -33,7 +33,8 @@
 #         Gregorian year, month and day and hours, minutes and seconds
 #         since midnight.
 #
-# Written by Lawrence D'Oliveiro <ldo@geek-central.gen.nz>.
+# Copyright 2007-2015 by Lawrence D’Oliveiro <ldo@geek-central.gen.nz>.
+# Licensed under CC-BY-SA <http://creativecommons.org/licenses/by-sa/4.0/>.
 #-
 
 import sys
