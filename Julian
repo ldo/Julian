@@ -39,6 +39,7 @@
 
 import sys
 import time
+import datetime
 import getopt
 
 #+
@@ -46,49 +47,121 @@ import getopt
 #-
 
 seconds_per_day = 86400
-unix_base_julian_day = 2440588 # = gregorian_to_julian_day(1970, 1, 1)
-unix_base_julian_seconds = unix_base_julian_day * seconds_per_day
 
-def gregorian_to_julian_day(year, month, day) :
-    """returns the Julian day number corresponding to the specified
-    Gregorian calendar date."""
-    m = int((month - 14) / 12)
-    return \
-        (
-            int(1461 * (year + 4800 + m) / 4)
-        +
-            int(367 * (month - 2 - 12 * m) / 12)
-        -
-            int(3 * ((year + 4900 + m) // 100) / 4)
-        +
-            day
-        -
-            32075
-        )
-#end gregorian_to_julian_day
+julian_day_offset = 1721425 # add to datetime.datetime.toordinal() to get Julian day number
 
-def julian_day_to_gregorian(julian_day) :
-    """returns the Gregorian calendar date (year, month, day) corresponding
-    to the specified Julian day number."""
-    l = julian_day + 68569
-    n = int(4 * l / 146097)
-    l = l - int((146097 * n + 3) / 4)
-    i = int((4000 * (l + 1)) / 1461001)
-    l = l - int(1461 * i / 4) + 31
-    j = int(80 * l / 2447)
-    day = l - int(2447 * j / 80)
-    l = int(j / 11)
-    month = j + 2 - 12 * l
-    year = 100 * (n - 49) + i + l
-    return (year, month, day)
-#end julian_day_to_gregorian
+gregorian_years_repeat = 400
+  # calendar rules repeat every this number of years (interval contains 97 leap years)
+gregorian_weeks_repeat = 20871 # exactly this number of weeks in 400 Gregorian calendar years
+
+class Date :
+    "extension of datetime.date to handle a wider range of years."
+
+    def __init__(self, *args) :
+        if len(args) == 3 :
+            year, month, day = args
+            if year < datetime.MINYEAR or year > datetime.MAXYEAR :
+                adj_year = (year - datetime.MINYEAR) % gregorian_years_repeat + datetime.MINYEAR
+                self.cycle_adjust = (year - adj_year) // gregorian_years_repeat # will be exact division
+                year = adj_year
+            else :
+                self.cycle_adjust = 0
+            #end if
+            self._date = datetime.date(year, month, day)
+        elif len(args) == 2 : # internal shortcut use
+            self._date, self.cycle_adjust = args
+        else :
+            raise ValueError("usage: Date(y, m, d)")
+        #end if
+    #end __init__
+
+    @property
+    def year(self) :
+        return self._date.year + self.cycle_adjust * gregorian_years_repeat
+    #end year
+
+    @property
+    def month(self) :
+        return self._date.month
+    #end year
+
+    @property
+    def day(self) :
+        return self._date.day
+    #end day
+
+    @classmethod
+    def fromordinal(celf, n) :
+        if n < 1 or n > datetime.date.max.toordinal() :
+            adj_days = (n - 1) % (gregorian_weeks_repeat * 7) + 1
+            cycle_adjust = (n - adj_days) // (gregorian_weeks_repeat * 7) # will be exact division
+            n = adj_days
+        else :
+            cycle_adjust = 0
+        #end if
+        return Date(datetime.date.fromordinal(n), cycle_adjust)
+    #end fromordinal
+
+    def toordinal(self) :
+        return self._date.toordinal() + self.cycle_adjust * gregorian_weeks_repeat * 7
+    #end toordinal
+
+    def replace(self, year = None, month = None, day = None) :
+        "returns the same Date, except for replacement of whichever arguments are specified."
+        if year == None :
+            year = self.year
+        #end if
+        if month == None :
+            month = self.month
+        #end if
+        if day == None :
+            day = self.day
+        #end if
+        return Date(year, month, day)
+    #end replace
+
+    def __add__(self, delta) :
+        "adds a Date to a timedelta, giving a new Date."
+        return Date.fromordinal(self.toordinal() + delta.days)
+    #end __add__
+
+    def __sub__(self, other) :
+        "subtracts two Dates, returning a datetime.timedelta."
+        return \
+            datetime.timedelta \
+              (
+                days =
+                        (self._date - other._date).days
+                    +
+                        (self.cycle_adjust - other.cycle_adjust) * gregorian_weeks_repeat * 7
+              )
+    #end __sub__
+
+    def weekday(self) :
+        "returns day of week, [Mon .. Sun] => [0 .. 6]."
+        return self._date.weekday()
+    #end weekday
+
+    def isoweekday(self) :
+        "returns day of week, [Mon .. Sun] => [1 .. 7]."
+        return self._date.isoweekday()
+    #end isoweekday
+
+    def isocalendar(self) :
+        result = self._date.isocalendar()
+        return (result[0] + self.cycle_adjust * gregorian_years_repeat, result[1], result[2])
+    #end isocalendar
+
+#end Date
+
+unix_base_julian_day = Date(1970, 1, 1).toordinal() + julian_day_offset
 
 def now_julian() :
     """returns the number of Julian-day seconds for the
     present moment (UTC)."""
     return \
         (
-            unix_base_julian_seconds
+            unix_base_julian_day * seconds_per_day
         +
             int(time.time())
         )
@@ -98,76 +171,44 @@ def now_julian() :
 # Mainline
 #-
 
-(opts, args) = getopt.getopt \
-  (
-    sys.argv[1:],
-    "dfs",
-    ["days", "fracdays", "seconds",]
-  )
-do_what = None
-for keyword, value in opts :
-    if keyword == "-d" or keyword == "--days" :
-        do_what = "days"
-    elif keyword == "-f" or keyword == "--fracdays" :
-        do_what = "fracdays"
-    elif keyword == "-s" or keyword == "--seconds" :
-        do_what = "seconds"
+def mainline() :
+    (opts, args) = getopt.getopt \
+      (
+        sys.argv[1:],
+        "dfs",
+        ["days", "fracdays", "seconds",]
+      )
+    do_what = None
+    for keyword, value in opts :
+        if keyword == "-d" or keyword == "--days" :
+            do_what = "days"
+        elif keyword == "-f" or keyword == "--fracdays" :
+            do_what = "fracdays"
+        elif keyword == "-s" or keyword == "--seconds" :
+            do_what = "seconds"
+        #end if
+    #end for
+    if do_what == None :
+        raise getopt.GetoptError("must specify either --days or --seconds")
     #end if
-#end for
-if do_what == None :
-    raise getopt.GetoptError("must specify either --days or --seconds")
-#end if
-if do_what == "seconds" : # conversions in seconds
-    if len(args) == 1 :
-        timeval = int(args[0])
-        dateval = julian_day_to_gregorian(timeval // seconds_per_day)
-        timeval %= seconds_per_day
-        hours = timeval // 3600
-        minutes = timeval // 60 % 60
-        seconds = timeval % 60
-        result = dateval + (hours, minutes, seconds)
-    elif len(args) == 6 :
-        result = \
-          (
-                    gregorian_to_julian_day
-                      (
-                        int(args[0]),
-                        int(args[1]),
-                        int(args[2])
-                      )
-                *
-                    seconds_per_day
-            +
-                int(args[3]) * 3600
-            +
-                int(args[4]) * 60
-            +
-                int(args[5]),
-          )
-    elif len(args) == 0 :
-        result = (now_julian(),)
-    else :
-        raise getopt.GetoptError("must specify 0, 1 or 6 args for --seconds")
-    #end if
-elif do_what == "fracdays" :
-    if len(args) == 1 :
-        timeval = float(args[0])
-        dateval = julian_day_to_gregorian(int(timeval))
-        time_of_day = int((timeval - int(timeval)) * seconds_per_day)
-        hours = int(time_of_day) // 3600
-        minutes = int(time_of_day) // 60 % 60
-        seconds = time_of_day % 60
-        result = dateval + (hours, minutes, seconds)
-    elif len(args) == 6 :
-        result = \
-          (
-                (
-                        gregorian_to_julian_day
-                          (
-                            int(args[0]),
-                            int(args[1]),
-                            int(args[2])
-                          )
+    if do_what == "seconds" : # conversions in seconds
+        if len(args) == 1 :
+            timeval = int(args[0])
+            dateval = Date.fromordinal(timeval // seconds_per_day - julian_day_offset)
+            dateval = (dateval.year, dateval.month, dateval.day)
+            timeval %= seconds_per_day
+            hours = timeval // 3600
+            minutes = timeval // 60 % 60
+            seconds = timeval % 60
+            result = dateval + (hours, minutes, seconds)
+        elif len(args) == 6 :
+            result = \
+              (
+                        (
+                            Date(int(args[0]), int(args[1]), int(args[2])).toordinal()
+                        +
+                            julian_day_offset
+                        )
                     *
                         seconds_per_day
                 +
@@ -175,28 +216,67 @@ elif do_what == "fracdays" :
                 +
                     int(args[4]) * 60
                 +
-                    int(args[5])
+                    int(args[5]),
+              )
+        elif len(args) == 0 :
+            result = (now_julian(),)
+        else :
+            raise getopt.GetoptError("must specify 0, 1 or 6 args for --seconds")
+        #end if
+    elif do_what == "fracdays" :
+        if len(args) == 1 :
+            timeval = float(args[0])
+            dateval = Date.fromordinal(int(timeval) - julian_day_offset)
+            dateval = (dateval.year, dateval.month, dateval.day)
+            time_of_day = int((timeval - int(timeval)) * seconds_per_day)
+            hours = int(time_of_day) // 3600
+            minutes = int(time_of_day) // 60 % 60
+            seconds = time_of_day % 60
+            result = dateval + (hours, minutes, seconds)
+        elif len(args) == 6 :
+            result = \
+              (
+                    (
+                            (
+                                Date(int(args[0]), int(args[1]), int(args[2])).toordinal()
+                            +
+                                julian_day_offset
+                            )
+                        *
+                            seconds_per_day
+                    +
+                        int(args[3]) * 3600
+                    +
+                        int(args[4]) * 60
+                    +
+                        int(args[5])
+                    )
+                /
+                    seconds_per_day,
+              )
+        elif len(args) == 0 :
+            result = (now_julian() / seconds_per_day,)
+        else :
+            raise getopt.GetoptError("must specify 0, 1 or 6 args for --fracdays")
+        #end if
+    else : # conversions in whole days
+        if len(args) == 1 :
+            result = Date.fromordinal(int(args[0]) - julian_day_offset)
+            result = (result.year, result.month, result.day)
+        elif len(args) == 3 :
+            result = \
+                (
+                    Date(int(args[0]), int(args[1]), int(args[2])).toordinal() + julian_day_offset,
                 )
-            /
-                seconds_per_day,
-          )
-    elif len(args) == 0 :
-        result = (now_julian() / seconds_per_day,)
-    else :
-        raise getopt.GetoptError("must specify 0, 1 or 6 args for --fracdays")
+        elif len(args) == 0 :
+            result = (now_julian() // seconds_per_day,)
+        else :
+            raise getopt.GetoptError("must specify 0, 1 or 3 args for --days")
+        #end if
     #end if
-else : # conversions in whole days
-    if len(args) == 1 :
-        result = julian_day_to_gregorian(int(args[0]))
-    elif len(args) == 3 :
-        result = \
-            (
-                gregorian_to_julian_day(int(args[0]), int(args[1]), int(args[2])),
-            )
-    elif len(args) == 0 :
-        result = (now_julian() // seconds_per_day,)
-    else :
-        raise getopt.GetoptError("must specify 0, 1 or 3 args for --days")
-    #end if
+    sys.stdout.write(" ".join([str(i) for i in result]) + "\n")
+#end mainline
+
+if __name__ == "__main__" :
+    mainline()
 #end if
-sys.stdout.write(" ".join([str(i) for i in result]) + "\n")
