@@ -163,8 +163,7 @@ class Date :
 unix_base_julian_day = Date(1970, 1, 1).toordinal() + julian_day_offset
 
 def now_julian() :
-    """returns the number of Julian-day seconds for the
-    present moment (UTC)."""
+    "returns the number of Julian-day seconds for the present moment (UTC)."
     return \
         (
             unix_base_julian_day * seconds_per_day
@@ -174,11 +173,13 @@ def now_julian() :
 #end now_julian
 
 def ymd_to_julian(y, m, d) :
+    "returns the Julian day number corresponding to the specified year, month and day of month."
     return \
         Date(y, m, d).toordinal() + julian_day_offset
 #end ymd_to_julian
 
 def julian_to_ymd(j) :
+    "returns the (year, month, day) triple corresponding to the specified Julian day number."
     result = Date.fromordinal(j - julian_day_offset)
     return \
         (result.year, result.month, result.day)
