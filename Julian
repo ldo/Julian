@@ -33,6 +33,12 @@
 #         Gregorian year, month and day and hours, minutes and seconds
 #         since midnight.
 #
+# Additional option:
+#
+#    -a|--astron
+#         indicates that Julian days are to counted from noon UTC
+#         (astronomical convention) instead of midnight.
+#
 # Copyright 2007-2015 by Lawrence D’Oliveiro <ldo@geek-central.gen.nz>.
 # Licensed under CC-BY-SA <http://creativecommons.org/licenses/by-sa/4.0/>.
 #-
@@ -167,20 +173,34 @@ def now_julian() :
         )
 #end now_julian
 
+def ymd_to_julian(y, m, d) :
+    return \
+        Date(y, m, d).toordinal() + julian_day_offset
+#end ymd_to_julian
+
+def julian_to_ymd(j) :
+    result = Date.fromordinal(j - julian_day_offset)
+    return \
+        (result.year, result.month, result.day)
+#end julian_to_ymd
+
 #+
 # Mainline
 #-
 
 def mainline() :
+    astron_adjust = 0.0
     (opts, args) = getopt.getopt \
       (
         sys.argv[1:],
-        "dfs",
-        ["days", "fracdays", "seconds",]
+        "adfs",
+        ["astro", "days", "fracdays", "seconds",]
       )
     do_what = None
     for keyword, value in opts :
-        if keyword == "-d" or keyword == "--days" :
+        if keyword == "-a" or keyword == "--astro" :
+            astron_adjust = 0.5
+        elif keyword == "-d" or keyword == "--days" :
             do_what = "days"
         elif keyword == "-f" or keyword == "--fracdays" :
             do_what = "fracdays"
@@ -193,9 +213,8 @@ def mainline() :
     #end if
     if do_what == "seconds" : # conversions in seconds
         if len(args) == 1 :
-            timeval = int(args[0])
-            dateval = Date.fromordinal(timeval // seconds_per_day - julian_day_offset)
-            dateval = (dateval.year, dateval.month, dateval.day)
+            timeval = int(args[0]) + round(astron_adjust * seconds_per_day)
+            dateval = julian_to_ymd(timeval // seconds_per_day)
             timeval %= seconds_per_day
             hours = timeval // 3600
             minutes = timeval // 60 % 60
@@ -204,11 +223,7 @@ def mainline() :
         elif len(args) == 6 :
             result = \
               (
-                        (
-                            Date(int(args[0]), int(args[1]), int(args[2])).toordinal()
-                        +
-                            julian_day_offset
-                        )
+                        ymd_to_julian(int(args[0]), int(args[1]), int(args[2]))
                     *
                         seconds_per_day
                 +
@@ -216,7 +231,9 @@ def mainline() :
                 +
                     int(args[4]) * 60
                 +
-                    int(args[5]),
+                    int(args[5])
+                -
+                    round(astron_adjust * seconds_per_day),
               )
         elif len(args) == 0 :
             result = (now_julian(),)
@@ -225,9 +242,8 @@ def mainline() :
         #end if
     elif do_what == "fracdays" :
         if len(args) == 1 :
-            timeval = float(args[0])
-            dateval = Date.fromordinal(int(timeval) - julian_day_offset)
-            dateval = (dateval.year, dateval.month, dateval.day)
+            timeval = float(args[0]) + astron_adjust
+            dateval = julian_to_ymd(int(timeval))
             time_of_day = int((timeval - int(timeval)) * seconds_per_day)
             hours = int(time_of_day) // 3600
             minutes = int(time_of_day) // 60 % 60
@@ -236,38 +252,32 @@ def mainline() :
         elif len(args) == 6 :
             result = \
               (
-                    (
-                            (
-                                Date(int(args[0]), int(args[1]), int(args[2])).toordinal()
-                            +
-                                julian_day_offset
-                            )
-                        *
-                            seconds_per_day
-                    +
-                        int(args[3]) * 3600
-                    +
-                        int(args[4]) * 60
-                    +
-                        int(args[5])
-                    )
-                /
-                    seconds_per_day,
+                        (
+                                ymd_to_julian(int(args[0]), int(args[1]), int(args[2]))
+                            *
+                                seconds_per_day
+                        +
+                            int(args[3]) * 3600
+                        +
+                            int(args[4]) * 60
+                        +
+                            int(args[5])
+                        )
+                    /
+                        seconds_per_day
+                -
+                    astron_adjust,
               )
         elif len(args) == 0 :
-            result = (now_julian() / seconds_per_day,)
+            result = (now_julian() / seconds_per_day - astron_adjust,)
         else :
             raise getopt.GetoptError("must specify 0, 1 or 6 args for --fracdays")
         #end if
     else : # conversions in whole days
         if len(args) == 1 :
-            result = Date.fromordinal(int(args[0]) - julian_day_offset)
-            result = (result.year, result.month, result.day)
+            result = julian_to_ymd(int(args[0]))
         elif len(args) == 3 :
-            result = \
-                (
-                    Date(int(args[0]), int(args[1]), int(args[2])).toordinal() + julian_day_offset,
-                )
+            result = (ymd_to_julian(int(args[0]), int(args[1]), int(args[2])),)
         elif len(args) == 0 :
             result = (now_julian() // seconds_per_day,)
         else :
