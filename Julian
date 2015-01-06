@@ -35,7 +35,7 @@
 #
 # Additional option:
 #
-#    -a|--astron
+#    -a|--astro
 #         indicates that Julian days are to counted from noon UTC
 #         (astronomical convention) instead of midnight.
 #
